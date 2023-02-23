@@ -157,6 +157,50 @@ func (c *Cmd) delete() (err error) {
 	return
 }
 
+func deleteChildren(c *Cmd, path string) (err error) {
+	children, _, err := c.Conn.Children(path)
+	if err != nil {
+		return
+	}
+
+	ops := []interface{}{}
+
+	for _, child := range children {
+		path := fmt.Sprintf("%s/%s", path, child)
+
+		err = deleteChildren(c, path)
+
+		ops = append(ops, &zk.DeleteRequest{Path: path})
+
+		if err != nil {
+			return
+		}
+		fmt.Printf("Deleting %s\n", path)
+
+		if len(ops) == 2000 {
+			_, err = c.Conn.Multi(ops...)
+			if err != nil {
+				return
+			}
+
+			ops = []interface{}{}
+		}
+	}
+
+	if len(ops) > 0 {
+		_, err = c.Conn.Multi(ops...)
+		if err != nil {
+			return
+		}
+
+		ops = []interface{}{}
+	}
+
+	root, _ := splitPath(path)
+	suggestCache.del(root)
+	return
+}
+
 func (c *Cmd) deleteall() (err error) {
 	err = c.checkConn()
 	if err != nil {
@@ -164,34 +208,97 @@ func (c *Cmd) deleteall() (err error) {
 	}
 
 	p := "/"
+
 	options := c.Options
 	if len(options) > 0 {
 		p = options[0]
 	}
 	p = cleanPath(p)
 
-	children, _, err := c.Conn.Children(p)
-	if err != nil {
-		return
+	if p == "/" {
+		return errors.New("Cannot use root")
 	}
 
-	for _, child := range children {
-		path := fmt.Sprintf("%s/%s", p, child)
-		err = c.Conn.Delete(path, -1)
-		if err != nil {
-			return
-		}
-		fmt.Printf("Deleted %s\n", path)
+	if p == "/clickhouse" {
+		return errors.New("Cannot use /clickhouse")
+	}
+
+	if p == "/clickhouse/tables" {
+		return errors.New("Cannot use /clickhouse/tables")
+	}
+
+	if !strings.HasPrefix(p, "/clickhouse/backups") || p == "/clickhouse/backups" {
+		return errors.New("Only paths starting with /clickhouse/backups allowed")
+	}
+
+	err = deleteChildren(c, p)
+	if err != nil {
+		return
 	}
 
 	err = c.Conn.Delete(p, -1)
 	if err != nil {
 		return
 	}
-	fmt.Printf("Deleted %s\n", p)
 
 	root, _ := splitPath(p)
 	suggestCache.del(root)
+
+	return
+}
+
+func (c *Cmd) deletestalebackups() (err error) {
+	err = c.checkConn()
+	if err != nil {
+		return
+	}
+
+	backup_root := "/clickhouse/backups"
+
+	backups, _, err := c.Conn.Children(backup_root)
+	if err != nil {
+		return
+	}
+
+	for _, child := range backups {
+		backup_path := fmt.Sprintf("%s/%s", backup_root, child)
+
+		fmt.Printf("Found backup %s, checking if it's active\n", backup_path)
+
+		stage_path := fmt.Sprintf("%s/stage", backup_path)
+
+		var stages []string
+		stages, _, err = c.Conn.Children(stage_path)
+		if err != nil && err != zk.ErrNoNode {
+			return
+		}
+
+		var is_active = false
+		for _, stage := range stages {
+			if strings.HasPrefix(stage, "alive") {
+				is_active = true
+				break
+			}
+		}
+
+		if is_active {
+			fmt.Printf("Backup %s is active, not going to delete\n", backup_path)
+			continue
+		}
+
+		fmt.Printf("Backup %s is not active, deleting it\n", backup_path)
+		err = deleteChildren(c, backup_path)
+		if err != nil {
+			return
+		}
+
+		err = c.Conn.Delete(backup_path, -1)
+		if err != nil {
+			return
+		}
+
+	}
+
 	return
 }
 
@@ -277,6 +384,8 @@ func (c *Cmd) run() (err error) {
 		return c.delete()
 	case "deleteall":
 		return c.deleteall()
+	case "deletestalebackups":
+		return c.deletestalebackups()
 	case "close":
 		return c.close()
 	case "connect":
@@ -312,6 +421,7 @@ create <path> [<data>]
 set <path> [<data>]
 delete <path>
 deleteall <path>
+deletestalebackups
 connect <host:port>
 addauth <scheme> <auth>
 close

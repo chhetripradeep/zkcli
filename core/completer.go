@@ -15,6 +15,7 @@ var commands = []prompt.Suggest{
 	{Text: "set", Description: "Update a node"},
 	{Text: "delete", Description: "Delete a node"},
 	{Text: "deleteall", Description: "Delete a node recursively"},
+	{Text: "deletestalebackups", Description: "Delete ClickHouse nodes used for backups that are now inactive"},
 	{Text: "close", Description: "Close connection"},
 	{Text: "connect", Description: "Connect servers"},
 	{Text: "addauth", Description: "Add auth info"},
