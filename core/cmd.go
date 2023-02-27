@@ -192,8 +192,6 @@ func deleteChildren(c *Cmd, path string) (err error) {
 		if err != nil {
 			return
 		}
-
-		ops = []interface{}{}
 	}
 
 	root, _ := splitPath(path)
@@ -216,19 +214,19 @@ func (c *Cmd) deleteall() (err error) {
 	p = cleanPath(p)
 
 	if p == "/" {
-		return errors.New("Cannot use root")
+		return errors.New("cannot use root")
 	}
 
 	if p == "/clickhouse" {
-		return errors.New("Cannot use /clickhouse")
+		return errors.New("cannot use /clickhouse")
 	}
 
 	if p == "/clickhouse/tables" {
-		return errors.New("Cannot use /clickhouse/tables")
+		return errors.New("cannot use /clickhouse/tables")
 	}
 
 	if !strings.HasPrefix(p, "/clickhouse/backups") || p == "/clickhouse/backups" {
-		return errors.New("Only paths starting with /clickhouse/backups allowed")
+		return errors.New("only paths starting with /clickhouse/backups allowed")
 	}
 
 	err = deleteChildren(c, p)

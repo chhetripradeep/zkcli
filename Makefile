@@ -42,9 +42,22 @@ release-all:
 build:
 	CGO_ENABLED=0 go build -ldflags ${LDFLAGS}
 
+.PHONY: test
+test:
+	go test ./...
+
 .PHONY: lint
-lint:
+lint: install-tools
 	gofmt -s -w .
-	golint .
-	golint core
 	go vet
+	golangci-lint -v run --allow-parallel-runners ./...
+
+.PHONY: install-tools
+install-tools:
+	go install golang.org/x/tools/cmd/goimports@latest
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+.PHONY: upgrade-deps
+upgrade-deps:
+	go get -u ./...
+	go mod tidy

@@ -24,3 +24,6 @@ _testmain.go
 *.prof
 dist/
 zkcli
+
+# IDEs
+.idea
