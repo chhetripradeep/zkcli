@@ -100,7 +100,7 @@ func getChildrenCompletions(cmd *Cmd, root string) []prompt.Suggest {
 
 	s := make([]prompt.Suggest, len(children))
 	for i, child := range children {
-		p := "/"
+		var p string
 		if root == "/" {
 			p = fmt.Sprintf("/%s", child)
 		} else {

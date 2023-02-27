@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -61,21 +60,17 @@ func (c *Config) Connect() (conn *zk.Conn, err error) {
 	failed := false
 loop:
 	for {
-		select {
-		case event, ok := <-e:
-			n += 1
-			if ok && event.State == zk.StateConnected {
-				break loop
-			} else if n > 3 {
-				failed = true
-				break loop
-			}
+		event, ok := <-e
+		n += 1
+		if ok && event.State == zk.StateConnected {
+			break loop
+		} else if n > 3 {
+			failed = true
+			break loop
 		}
 	}
 	if failed {
-		err = errors.New(
-			fmt.Sprintf("Failed to connect to %s!", strings.Join(c.Servers, ",")),
-		)
+		err = fmt.Errorf("failed to connect to %s", strings.Join(c.Servers, ","))
 	}
 	return
 }
